@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# PyInstaller
+build/
+dist/
+*.manifest
+
+# Node / frontend (desktop/ has its own .gitignore too)
+node_modules/
+
+# Rust
+target/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.idea/

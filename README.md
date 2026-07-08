@@ -1,99 +1,106 @@
-# FPSBooster
+<div align="center">
 
-A game-focused PC optimizer for Windows with a modern dark-mode GUI:
-one-click reversible **Game Booster**, live **FPS overlay** (via Intel
-PresentMon), a better **task manager**, hardware **specs** and
-**bottleneck** analysis, display **resolution** switching, a **games
-library** launcher, performance **history charts**, and a full audit
-**log** of every change the app makes.
+# 🔥 Nitro Forge
 
-Built with Python 3.11+ / CustomTkinter / psutil / matplotlib / sqlite3.
+**Forge more FPS out of the PC you already own.**
 
-## Install
+A game-focused Windows optimizer with a modern desktop UI: one-click *reversible*
+Game Boost, a launcher-aware game library with box art, a real FPS overlay
+(Intel PresentMon), hardware specs & bottleneck analysis, performance history,
+and a full audit log of every change the app makes.
+
+*Dark UI - baby-blue accent - built to feel like Spotify/Discord/Steam, not a 2009 tweak tool.*
+
+</div>
+
+---
+
+## Architecture
+
+Native-speed engine, web-speed UI, smallest possible shell:
+
+```
+nitro-forge/
+├── desktop/          Desktop app
+│   ├── src/          React 19 + TypeScript + Tailwind 4 + Motion (the UI)
+│   └── src-tauri/    Tauri 2 (Rust) shell: window, single-instance,
+│                     sidecar lifecycle, graceful shutdown
+├── core/             Python system engine: booster, game scanner,
+│   │                 hardware info, processes, power/services/registry,
+│   │                 resolution, PresentMon wrapper, crash reporter
+│   └── data/         Bundled game catalog (top 2,500 titles + Steam appids)
+├── sidecar/          Local-only JSON API bridging the UI to the engine
+│                     (127.0.0.1, ephemeral port, per-session auth token)
+├── website/          Static marketing site (same dark/baby-blue theme)
+├── docs/             Architecture, building, Discord integration, website
+└── scripts/          Build & packaging scripts
+```
+
+**Why this stack?** Tauri gives a ~10 MB shell using the OS webview (Electron
+ships a whole Chromium, ~150 MB+ and far more RAM). React+TS+Tailwind gives a
+modern, animated, maintainable UI. The battle-tested Python engine does the
+actual system work behind strict safety guards, and everything speaks over a
+token-authenticated localhost API. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Features
+
+| | |
+|---|---|
+| 🚀 **Game Boost** | Suspends allowlisted background apps, raises game priority, performance power plan, Game Mode, pauses Windows Update/Search/telemetry - every change reverted automatically (undo, game exit, app close, or crash backstop) |
+| 🎮 **Game library** | Auto-detects Steam, Epic, Riot, GOG, Ubisoft, Battle.net, EA, Xbox installs; launches through each platform's own launcher (DRM/anti-cheat safe); box art with an "Unverified Game" fallback |
+| 📊 **FPS overlay** | Real frame timings via Intel PresentMon (ETW) - no game injection |
+| 🧠 **Insights** | CPU/GPU/RAM/FPS history, honest bottleneck analysis, audit log |
+| 🛠 **Task manager** | See what steals resources from your game; suspend/reprioritize/kill with OS-critical processes protected |
+| 🖥 **Display** | Resolution switching + per-game gaming resolution |
+| 📨 **Crash reporting** | Local diagnostic reports, optional Discord webhook + website API delivery, in-app feedback (see [docs/DISCORD_INTEGRATION.md](docs/DISCORD_INTEGRATION.md)) |
+
+## Safety design
+
+* Every system change goes on an undo stack and is **reverted automatically**.
+* Only small, visible **allowlists** can be suspended/paused. Nothing is enumerated-and-killed.
+* **Antivirus / security software is hard-blocked in code** - no toggle can touch it.
+* Every change is logged (old value → new value) in the app and `app.log`.
+* No fake buttons: things desktop software cannot do are presented as guidance.
+
+## Quick start (development)
 
 ```powershell
-# from the project folder
+# 1. Python engine
 py -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-py main.py
+
+# 2. Desktop app (needs Node 20+ and Rust)
+cd desktop
+npm install
+npm run tauri dev
 ```
 
-## Why run as Administrator?
+Run as Administrator for the full feature set (service pausing, PresentMon ETW).
 
-The app works without elevation, but these features need admin rights and
-are skipped (with a log entry) otherwise:
+## Building the installer
 
-* **Pausing services** during a boost (Windows Update, Windows Search,
-  SysMain, Downloaded Maps, Delivery Optimization, Telemetry) — `sc stop`
-  requires admin. They are always restarted on revert.
-* **PresentMon FPS capture** — frame timing comes from Windows ETW, which
-  requires elevation.
-* Changing priority/affinity of processes you don't own.
+```powershell
+scripts\build.ps1        # sidecar exe (PyInstaller) + Tauri NSIS installer
+```
 
-Use the **"Restart as Administrator"** button in the header, or right-click
-your shortcut → *Run as administrator*.
-
-## FPS overlay setup (PresentMon)
-
-Real FPS measurement requires frame-timing data. Instead of injecting code
-into games (cheat-tool territory, and out of scope for Python), FPSBooster
-shells out to **Intel PresentMon** — the free, digitally signed, open-source
-tool that industry overlays are built on.
-
-1. Download `PresentMon-x.x.x-x64.exe` from
-   <https://github.com/GameTechDev/PresentMon/releases>.
-2. Put it anywhere (e.g. `C:\Tools\PresentMon.exe`).
-3. In the **FPS Overlay** tab, browse to the exe once. Done.
-
-Both PresentMon 1.x and 2.x are supported. Note: games in *exclusive
-fullscreen* bypass all desktop overlays — use borderless/windowed mode.
-
-## Safety design (what this app will and won't do)
-
-* Every Booster change is recorded on an undo stack and **reverted
-  automatically** when the boosted game exits, when you click Undo, when
-  the app closes, and via an `atexit` backstop if it crashes.
-* Only small, visible **allowlists** can ever be suspended (background
-  apps) or paused (services). Nothing is enumerated-and-killed.
-* **Antivirus / security software is hard-blocked in code** — there is no
-  toggle anywhere that stops, pauses, or weakens Defender or any AV/security
-  service. Entries that look like security software are refused even if you
-  add them to the allowlist yourself.
-* Every system change is written to the **Logs** tab and `app.log`
-  (old value → new value), so you always have an audit trail.
-* Honesty over marketing: things a desktop app genuinely cannot do
-  (packet-level QoS, forcing laptop discrete-GPU mode, changing in-game
-  render settings, "clearing" standby RAM without a dedicated tool) are
-  presented as guidance, not fake buttons.
+See [docs/BUILDING.md](docs/BUILDING.md) for details and prerequisites.
 
 ## Data locations
 
 | What | Where |
 |---|---|
-| Settings | `%LOCALAPPDATA%\FPSBooster\settings.json` |
-| Performance history | `%LOCALAPPDATA%\FPSBooster\history.sqlite3` |
-| Log file | `%LOCALAPPDATA%\FPSBooster\app.log` (rotating) |
+| Settings | `%LOCALAPPDATA%\NitroForge\settings.json` |
+| Performance history | `%LOCALAPPDATA%\NitroForge\history.sqlite3` |
+| Logs | `%LOCALAPPDATA%\NitroForge\app.log` (rotating) |
+| Crash reports | `%LOCALAPPDATA%\NitroForge\crashes\` |
+| Cached box art | `%LOCALAPPDATA%\NitroForge\logos\` |
 
-## Project layout
+## Docs
 
-```
-main.py              entry point, window + tab shell, sampler wiring
-core/                config/allowlists, logger, sqlite, hardware info,
-                     processes, power/services/registry, resolution,
-                     network, game scanner, PresentMon wrapper, booster,
-                     bottleneck rules
-ui/                  theme + one module per tab
-overlay/             the always-on-top transparent FPS window
-```
-
-## Packaging to a single .exe (later)
-
-The project is PyInstaller-ready:
-
-```powershell
-pip install pyinstaller
-pyinstaller --onefile --windowed --name FPSBooster main.py
-```
-
-(`py-cpuinfo` uses multiprocessing — keep the provided `main()` guard.)
+* [Architecture](docs/ARCHITECTURE.md) - how the three layers fit together
+* [Building](docs/BUILDING.md) - dev setup, release builds, CI
+* [Discord integration](docs/DISCORD_INTEGRATION.md) - crash/bug/feedback reports into your server
+* [Website](docs/WEBSITE.md) - deploying the marketing site
+* [Changelog](CHANGELOG.md) - what changed in 2.0
+* [Contributing](CONTRIBUTING.md)

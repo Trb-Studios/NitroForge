@@ -54,7 +54,7 @@ def get_logger() -> logging.Logger:
     global _logger
     if _logger is not None:
         return _logger
-    lg = logging.getLogger("fpsbooster")
+    lg = logging.getLogger("nitroforge")
     lg.setLevel(logging.DEBUG)
     fmt = logging.Formatter("%(asctime)s %(levelname)-7s %(message)s",
                             "%H:%M:%S")

@@ -15,9 +15,7 @@ from __future__ import annotations
 
 import atexit
 import os
-import subprocess
 import threading
-import time
 
 import psutil
 
@@ -193,9 +191,26 @@ class Booster:
         return len(undo)
 
     # ------------------------------------------- boost + launch + watch
+    def attach_game(self, pid: int, name: str | None = None) -> None:
+        """Apply per-process tweaks once the real game process exists."""
+        with self._lock:
+            if not self.active:
+                return
+        if name:
+            self.boosted_game = name
+        if self._settings.get("boost_priority"):
+            self._raise_game_priority(pid)
+        if self._settings.get("boost_affinity"):
+            self._tune_affinity(pid)
+
     def boost_and_launch(self, game: game_scanner.Game,
-                         on_exit=None) -> subprocess.Popen | None:
-        """Apply gaming resolution + boost, launch, auto-revert on exit."""
+                         on_exit=None) -> game_scanner.LaunchResult:
+        """Apply gaming resolution + boost, launch, auto-revert on exit.
+
+        Launcher-URI launches (Steam/Epic/Ubisoft/Riot) give us no child
+        handle, so a watcher thread waits for the game's process to appear,
+        attaches priority/affinity to it, and reverts when it exits.
+        """
         s = self._settings
         res_switched = False
         if s.get("apply_res_on_game") and s.get("gaming_resolution"):
@@ -204,19 +219,28 @@ class Booster:
             # also explicitly restore on exit below.
             res_switched = resolution_utils.set_mode(w, h, hz, persist=False)
 
-        proc = game_scanner.launch(game)
-        if proc is None:
+        result = game_scanner.launch(game)
+        if not result.ok:
             if res_switched:
                 resolution_utils.restore_default()
-            self._log.error("Could not launch %s (exe missing?)", game.name)
-            return None
+            self._log.error("Could not launch %s: %s", game.name, result.error)
+            return result
 
-        time.sleep(2.0)      # let the real game process settle
-        self.apply(game_pid=proc.pid, game_exe=game.exe)
+        # system-level tweaks right away; per-process ones when it appears
+        self.apply(game_exe=game.exe or game.name)
 
         def _watch():
+            pid = result.proc.pid if result.proc else None
+            if pid is None and game.exe:
+                pid = game_scanner.wait_for_process(game.exe, timeout=120)
+            if pid is None:
+                self._log.warning(
+                    "%s: game process not found - boost stays active until "
+                    "you press Undo.", game.name)
+                return
+            self.attach_game(pid, os.path.basename(game.exe) or game.name)
             try:
-                psutil.Process(proc.pid).wait()
+                psutil.Process(pid).wait()
             except psutil.Error:
                 pass
             self._log.info("%s exited - auto-reverting boost", game.name)
@@ -228,4 +252,4 @@ class Booster:
 
         threading.Thread(target=_watch, daemon=True,
                          name=f"watch-{game.name}").start()
-        return proc
+        return result

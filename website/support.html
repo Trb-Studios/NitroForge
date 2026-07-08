@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Support - Nitro Forge</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<nav class="nav">
+  <div class="container nav-inner">
+    <a class="brand" href="index.html">
+      <span class="mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#06121d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+      </span>
+      Nitro&nbsp;<em>Forge</em>
+    </a>
+    <div class="nav-links">
+      <a href="index.html#features">Features</a>
+      <a href="index.html#download">Download</a>
+      <a class="btn" href="index.html#download">Get Nitro Forge</a>
+    </div>
+  </div>
+</nav>
+
+<main class="prose">
+  <h1>Support</h1>
+  <div class="updated">How to get help, report bugs and send feedback.</div>
+
+  <h2>Report a bug / send feedback</h2>
+  <p>
+    The fastest way is inside the app: <strong>Settings → Send feedback / report a bug</strong>.
+    Reports include your app version, an anonymous hardware summary and (optionally)
+    recent log lines - everything needed to actually fix the issue.
+  </p>
+
+  <h2>Common questions</h2>
+
+  <h2 style="font-size:16px">A game won't launch from the library</h2>
+  <ul>
+    <li>Games with a rocket badge launch through their own launcher (Steam, Epic, Riot...). Make sure that launcher is installed and signed in.</li>
+    <li>For unrecognized games, use <code>Games → Add game</code> and point at the real game exe.</li>
+  </ul>
+
+  <h2 style="font-size:16px">The FPS overlay shows "-- FPS"</h2>
+  <ul>
+    <li>PresentMon must be configured once: <code>System → FPS Overlay → Locate exe</code>.</li>
+    <li>Run Nitro Forge as Administrator (frame timing uses Windows ETW, which needs elevation).</li>
+    <li>Games in exclusive fullscreen bypass all desktop overlays - use borderless/windowed.</li>
+  </ul>
+
+  <h2 style="font-size:16px">Some boost options are skipped</h2>
+  <p>
+    Pausing Windows services requires Administrator rights. Everything else works
+    without elevation and is logged in <code>Insights → Logs</code>.
+  </p>
+
+  <h2 style="font-size:16px">Where is my data?</h2>
+  <p>
+    Everything lives in <code>%LOCALAPPDATA%\NitroForge</code> - settings, performance
+    history, logs and crash reports. Delete that folder and the app is factory-reset.
+  </p>
+
+  <div class="card-note">
+    <strong>Safety promise:</strong> every change Nitro Forge makes is recorded and
+    reverted - on undo, on game exit, on app close, and via a backstop if the app
+    crashes. Antivirus/security software is hard-blocked in code and can never be
+    touched, by any setting.
+  </div>
+</main>
+
+<footer>
+  <div class="container foot">
+    <div class="links">
+      <a href="index.html">Home</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+    </div>
+    <div class="copy">© 2026 TRB Studios.</div>
+  </div>
+</footer>
+
+</body>
+</html>

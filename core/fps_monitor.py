@@ -90,7 +90,7 @@ class FpsMonitor:
     def _build_args(exe: str, style: str, process_name: str | None) -> list:
         p = "--" if style == "v2" else "-"
         args = [exe, f"{p}output_stdout", f"{p}stop_existing_session",
-                f"{p}session_name", "fpsbooster"]
+                f"{p}session_name", "nitroforge"]
         if process_name:
             args += [f"{p}process_name", process_name]
         return args

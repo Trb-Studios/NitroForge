@@ -13,15 +13,53 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import sys
 from pathlib import Path
 
-APP_NAME = "FPSBooster"
-APP_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / APP_NAME
+APP_NAME = "NitroForge"
+APP_DISPLAY_NAME = "Nitro Forge"
+APP_VERSION = "2.0.0"
+
+_LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
+APP_DIR = _LOCALAPPDATA / APP_NAME
+LEGACY_DIR = _LOCALAPPDATA / "FPSBooster"   # pre-rebrand data location
+
+
+def _migrate_legacy_dir() -> None:
+    """One-time move from the old FPSBooster data dir.
+
+    Settings carry over; old analytics/history and logs are deliberately
+    dropped (fresh telemetry start), and the legacy dir is removed.
+    """
+    if not LEGACY_DIR.is_dir() or APP_DIR.exists():
+        return
+    APP_DIR.mkdir(parents=True, exist_ok=True)
+    old_settings = LEGACY_DIR / "settings.json"
+    if old_settings.is_file():
+        try:
+            shutil.copy2(old_settings, APP_DIR / "settings.json")
+        except OSError:
+            pass
+    shutil.rmtree(LEGACY_DIR, ignore_errors=True)
+
+
+_migrate_legacy_dir()
 APP_DIR.mkdir(parents=True, exist_ok=True)
 
 LOG_FILE = APP_DIR / "app.log"
 DB_FILE = APP_DIR / "history.sqlite3"
 SETTINGS_FILE = APP_DIR / "settings.json"
+LOGO_CACHE_DIR = APP_DIR / "logos"          # downloaded game art
+CRASH_DIR = APP_DIR / "crashes"             # diagnostic reports
+
+# Bundled read-only data (game catalog).  When frozen with PyInstaller the
+# files are unpacked under sys._MEIPASS/core/data (see sidecar.spec).
+if getattr(sys, "frozen", False):
+    DATA_DIR = Path(sys._MEIPASS) / "core" / "data"   # type: ignore[attr-defined]
+else:
+    DATA_DIR = Path(__file__).resolve().parent / "data"
+GAME_CATALOG_FILE = DATA_DIR / "game_catalog.json"
 
 SAMPLE_INTERVAL_SEC = 3.0          # background history sampling cadence
 PRESENTMON_URL = "https://github.com/GameTechDev/PresentMon/releases"
@@ -123,6 +161,12 @@ DEFAULTS = {
     "overlay_corner": "top-left",
     "overlay_size": "medium",
     "appearance_mode": "dark",
+    # Crash / bug / feedback reporting (all opt-in; see docs/DISCORD_INTEGRATION.md)
+    "report_enabled": True,            # write local diagnostic reports
+    "report_auto_send": False,         # send crash reports without asking
+    "report_discord_webhook": "",      # paste a Discord webhook URL to enable
+    "report_site_url": "",             # POST endpoint on your website API
+    "report_include_logs": True,       # attach recent log lines to reports
 }
 
 

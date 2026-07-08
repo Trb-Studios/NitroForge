@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  engine:
+    name: Python engine
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Byte-compile core + sidecar
+        run: python -m compileall core sidecar
+      - name: Catalog + crash-report smoke test
+        run: |
+          pip install psutil
+          python -c "from core import config, crash_reporter, game_catalog; assert game_catalog.catalog_size() > 2000; crash_reporter.build_report('feedback','ci','')"
+
+  ui:
+    name: UI (typecheck + bundle)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+        working-directory: desktop
+      - run: npm run build
+        working-directory: desktop
+
+  shell:
+    name: Tauri shell (cargo check)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - run: cargo check
+        working-directory: desktop/src-tauri
+
+  release:
+    name: Release installer
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [engine, ui, shell]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build sidecar
+        run: |
+          pip install -r requirements.txt pyinstaller
+          pyinstaller sidecar.spec --noconfirm
+      - name: Build installer
+        run: |
+          npm ci
+          npm run tauri build
+        working-directory: desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nitro-forge-installer
+          path: desktop/src-tauri/target/release/bundle/nsis/*.exe

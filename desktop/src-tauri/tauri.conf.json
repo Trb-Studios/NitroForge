@@ -1,0 +1,70 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Nitro Forge",
+  "version": "2.0.0",
+  "identifier": "com.nitroforge.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Nitro Forge",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 1020,
+        "minHeight": 680,
+        "center": true,
+        "decorations": false,
+        "shadow": true
+      },
+      {
+        "label": "overlay",
+        "title": "Nitro Forge Overlay",
+        "url": "overlay.html",
+        "width": 240,
+        "height": 96,
+        "x": 24,
+        "y": 24,
+        "visible": false,
+        "transparent": true,
+        "decorations": false,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "closable": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "TRB Studios",
+    "shortDescription": "Game-focused PC optimizer",
+    "longDescription": "Nitro Forge boosts your PC for gaming: one-click reversible optimizations, launcher-aware game library, live FPS overlay, hardware insights and bottleneck analysis.",
+    "resources": {
+      "../../dist/nitro-forge-sidecar.exe": "./"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico"
+      }
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
