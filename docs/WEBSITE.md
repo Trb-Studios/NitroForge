@@ -15,26 +15,32 @@ build step) that mirrors the app's dark + baby-blue design system.
 Shared assets: `css/style.css` (design tokens at the top match
 `desktop/src/index.css`), `js/main.js` (scroll-reveal animations).
 
-## Point the download button at your installer
+## The download button
 
-`index.html` links to:
+The installer is hosted **on the site itself** at
+`website/downloads/NitroForgeSetup.exe`, so the button is a direct download -
+one click, no GitHub page in between. After building a new installer
+(`scripts\build.ps1`), refresh it with:
 
+```powershell
+Copy-Item "desktop\src-tauri\target\release\bundle\nsis\Nitro Forge_*_x64-setup.exe" `
+          "website\downloads\NitroForgeSetup.exe" -Force
 ```
-https://github.com/Trb-Studios/NitroForge/releases/latest
-```
 
-Update this href (2 places: hero + download card) if the repo name differs, or
-link directly to a specific asset:
-`.../releases/latest/download/Nitro.Forge_2.0.0_x64-setup.exe`
+commit, and push - the Pages workflow redeploys automatically.
+
+(Alternative: create a GitHub Release and point the button at
+`.../releases/latest/download/<asset>.exe` if you'd rather not keep the
+binary in the repo.)
 
 ## Deploying
 
-Any static host works - no server code required.
+Deployment is automated: `.github/workflows/pages.yml` publishes `website/`
+to **GitHub Pages** on every push that touches it. First-time setup, if the
+workflow can't self-enable Pages: repo → Settings → Pages → Source:
+*GitHub Actions*, then re-run the workflow.
 
-**GitHub Pages (free, easiest):**
-1. Repo → Settings → Pages → Source: *Deploy from a branch*
-2. Branch `main`, folder `/website` (or copy `website/` into a `gh-pages` branch root)
-3. Site appears at `https://<user>.github.io/<repo>/`
+Site URL: `https://<user>.github.io/<repo>/`
 
 **Cloudflare Pages / Netlify / Vercel:** create a project from the repo, set
 the output directory to `website`, no build command.

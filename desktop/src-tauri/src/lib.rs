@@ -81,8 +81,20 @@ fn spawn_sidecar(token: &str) -> Result<(u16, Child), String> {
     Ok((port, child))
 }
 
+/// Kill the whole process tree. A PyInstaller onefile exe is really two
+/// processes (bootloader + app); killing only the direct child would
+/// orphan the inner Python process.
+#[cfg(windows)]
+fn kill_tree(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    let _ = Command::new("taskkill")
+        .args(["/F", "/T", "/PID", &pid.to_string()])
+        .creation_flags(0x0800_0000)
+        .status();
+}
+
 /// Ask the sidecar to shut down cleanly (it reverts any active boost),
-/// then hard-kill if it lingers. Raw HTTP over TcpStream - no client dep.
+/// then hard-kill the tree if it lingers. Raw HTTP over TcpStream.
 fn stop_sidecar(port: u16, token: &str, child: &mut Child) {
     if let Ok(mut s) = TcpStream::connect(("127.0.0.1", port)) {
         let req = format!(
@@ -101,26 +113,13 @@ fn stop_sidecar(port: u16, token: &str, child: &mut Child) {
         }
         std::thread::sleep(Duration::from_millis(150));
     }
+    #[cfg(windows)]
+    kill_tree(child.id());
     let _ = child.kill();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let token: String = rand::rng()
-        .sample_iter(&Alphanumeric)
-        .take(40)
-        .map(char::from)
-        .collect();
-    let (port, child) = match spawn_sidecar(&token) {
-        Ok((port, child)) => (port, Some(child)),
-        Err(e) => {
-            // Still open the UI so the user sees a friendly error state
-            // instead of nothing; the frontend detects the dead sidecar.
-            eprintln!("FATAL: {e}");
-            (0, None)
-        }
-    };
-
     let app = tauri::Builder::default()
         // Must be registered first: a second launch focuses the existing
         // window and exits immediately (fixes the multi-instance bug).
@@ -133,22 +132,53 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .manage(Sidecar {
-            port,
-            token: token.clone(),
-            child: Mutex::new(child),
+        // The sidecar is spawned HERE, after the single-instance gate: a
+        // blocked second launch exits before this runs, so it can never
+        // leak an orphan engine process.
+        .setup(|app| {
+            let token: String = rand::rng()
+                .sample_iter(&Alphanumeric)
+                .take(40)
+                .map(char::from)
+                .collect();
+            let (port, child) = match spawn_sidecar(&token) {
+                Ok((port, child)) => (port, Some(child)),
+                Err(e) => {
+                    // Still open the UI so the user sees a friendly error
+                    // state; the frontend detects the dead sidecar.
+                    eprintln!("FATAL: {e}");
+                    (0, None)
+                }
+            };
+            app.manage(Sidecar {
+                port,
+                token,
+                child: Mutex::new(child),
+            });
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![get_sidecar_info])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(move |app_handle, event| {
-        if let tauri::RunEvent::Exit = event {
+    app.run(move |app_handle, event| match event {
+        // The hidden overlay window would keep the process alive after the
+        // main window closes, leaving a ghost instance that blocks every
+        // future launch. Closing the main window must quit the app.
+        tauri::RunEvent::WindowEvent {
+            label,
+            event: tauri::WindowEvent::Destroyed,
+            ..
+        } if label == "main" => {
+            app_handle.exit(0);
+        }
+        tauri::RunEvent::Exit => {
             let state: tauri::State<Sidecar> = app_handle.state();
             let taken = state.child.lock().unwrap().take();
             if let Some(mut child) = taken {
                 stop_sidecar(state.port, &state.token, &mut child);
             }
         }
+        _ => {}
     });
 }
