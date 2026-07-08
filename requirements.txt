@@ -1,0 +1,10 @@
+customtkinter>=5.2.2
+psutil>=5.9.8
+py-cpuinfo>=9.0.0
+GPUtil>=1.4.0
+nvidia-ml-py>=12.535.0
+WMI>=1.5.1
+pywin32>=306
+screeninfo>=0.8.1
+matplotlib>=3.8.0
+setuptools>=68.0
