@@ -19,7 +19,8 @@ import threading
 
 import psutil
 
-from core import config, game_scanner, power_utils, process_utils, resolution_utils
+from core import (config, game_scanner, power_utils, process_utils,
+                  resolution_utils, tweaks)
 from core.logger import get_logger
 
 
@@ -42,6 +43,18 @@ class Booster:
     def changes(self) -> list[str]:
         with self._lock:
             return [d for d, _ in self._undo]
+
+    def _reversible(self, desc: str, apply_fn, restore_fn) -> None:
+        """Run an apply_* that returns a restore snapshot (or None = no-op).
+        Only registers an undo when something actually changed, so revert
+        restores the exact prior state and nothing else."""
+        try:
+            snapshot = apply_fn()
+        except Exception as exc:                 # a tweak must never abort boost
+            self._log.warning("Tweak '%s' failed: %s", desc, exc)
+            return
+        if snapshot is not None:
+            self._track(desc, lambda s=snapshot: restore_fn(s))
 
     # ------------------------------------------------------------- apply
     def apply(self, game_pid: int | None = None,
@@ -66,6 +79,22 @@ class Booster:
             self._reduce_visual_effects()
         if s.get("boost_services"):
             self._pause_services()
+        # advanced reversible latency tweaks (each restores its exact snapshot)
+        if s.get("boost_network_latency"):
+            self._reversible("Disabled Nagle's algorithm (lower packet latency)",
+                             tweaks.apply_nagle_off, tweaks.restore_nagle)
+        if s.get("boost_responsiveness"):
+            self._reversible("Network throttling off + system responsiveness 0",
+                             tweaks.apply_responsiveness,
+                             tweaks.restore_responsiveness)
+        if s.get("boost_games_scheduling"):
+            self._reversible("Raised MMCSS Games task priority (GPU/CPU/IO)",
+                             tweaks.apply_games_scheduling,
+                             tweaks.restore_games_scheduling)
+        if s.get("boost_power_latency"):
+            self._reversible("USB selective suspend off + CPU core parking off",
+                             tweaks.apply_power_latency,
+                             tweaks.restore_power_latency)
         if game_pid:
             if s.get("boost_priority"):
                 self._raise_game_priority(game_pid)

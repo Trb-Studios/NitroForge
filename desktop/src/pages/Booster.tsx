@@ -23,6 +23,14 @@ const FEATURES: [string, string, string][] = [
    "Sets 'adjust for best performance'. Mostly helps older PCs; parts apply after re-login."],
   ["boost_services", "Pause background services",
    "Temporarily stops Windows Update, Search, SysMain, Maps, Delivery Optimization, Telemetry. Restarted on revert. Needs admin. Security/AV services are hard-blocked in code."],
+  ["boost_network_latency", "Disable Nagle's algorithm",
+   "Sends small game packets immediately instead of batching them - lower, steadier ping. Per-adapter registry values, restored exactly on revert. Needs admin."],
+  ["boost_responsiveness", "Lift network throttling + system responsiveness",
+   "NetworkThrottlingIndex off and SystemResponsiveness 0 give the foreground game more CPU/network priority. Restored on revert. Needs admin."],
+  ["boost_games_scheduling", "Raise MMCSS 'Games' scheduling priority",
+   "Tells Windows' multimedia scheduler to give games top GPU/CPU/IO priority (GPU 8, Priority 6, High). Restored on revert. Needs admin."],
+  ["boost_power_latency", "USB power-parking off + CPU core parking off",
+   "Stops Windows suspending USB devices (your mouse/keyboard) and parking CPU cores mid-game. Restored to your previous plan values on revert. Needs admin."],
 ];
 
 export default function Booster({ live }: { live: Live | null }) {

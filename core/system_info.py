@@ -23,6 +23,35 @@ from core.logger import get_logger
 
 _wmi_local = threading.local()
 
+# processes that are never "the game" for FPS auto-targeting
+_NON_GAME_FOREGROUND = {
+    "nitro-forge.exe", "explorer.exe", "searchhost.exe", "shellexperiencehost.exe",
+    "applicationframehost.exe", "startmenuexperiencehost.exe", "dwm.exe",
+    "textinputhost.exe", "python.exe", "pythonw.exe", "code.exe", "cmd.exe",
+    "powershell.exe", "windowsterminal.exe",
+}
+
+
+def foreground_process_name() -> str | None:
+    """Executable name (lowercased) of the window the user is focused on, or
+    None if it is the desktop / one of our own / a non-game shell window.
+
+    Used to auto-point the FPS overlay at whatever game is in the foreground.
+    """
+    try:
+        user32 = ctypes.windll.user32
+        hwnd = user32.GetForegroundWindow()
+        if not hwnd:
+            return None
+        pid = ctypes.c_ulong()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if not pid.value:
+            return None
+        name = psutil.Process(pid.value).name().lower()
+        return None if name in _NON_GAME_FOREGROUND else name
+    except (psutil.Error, OSError, ValueError):
+        return None
+
 
 def _wmi():
     """Per-thread WMI connection (COM must be initialised per thread)."""

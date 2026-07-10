@@ -95,27 +95,46 @@ fn kill_tree(pid: u32) {
 
 /// Ask the sidecar to shut down cleanly (it reverts any active boost),
 /// then hard-kill the tree if it lingers. Raw HTTP over TcpStream.
+///
+/// Every network call is bounded by a timeout so this can NEVER hang the
+/// exit path -- a wedged sidecar must not keep the app process alive (that
+/// was the "won't reopen / runs in background" ghost-process bug).
 fn stop_sidecar(port: u16, token: &str, child: &mut Child) {
-    if let Ok(mut s) = TcpStream::connect(("127.0.0.1", port)) {
-        let req = format!(
-            "POST /api/shutdown HTTP/1.1\r\nHost: 127.0.0.1\r\n\
-             X-NF-Token: {token}\r\nContent-Length: 0\r\n\
-             Connection: close\r\n\r\n"
-        );
-        let _ = s.write_all(req.as_bytes());
-        let _ = s.set_read_timeout(Some(Duration::from_secs(3)));
-        let mut buf = [0u8; 256];
-        let _ = s.read(&mut buf);
+    if port != 0 {
+        let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+        if let Ok(mut s) = TcpStream::connect_timeout(&addr, Duration::from_secs(2)) {
+            let req = format!(
+                "POST /api/shutdown HTTP/1.1\r\nHost: 127.0.0.1\r\n\
+                 X-NF-Token: {token}\r\nContent-Length: 0\r\n\
+                 Connection: close\r\n\r\n"
+            );
+            let _ = s.set_write_timeout(Some(Duration::from_secs(2)));
+            let _ = s.write_all(req.as_bytes());
+            let _ = s.set_read_timeout(Some(Duration::from_secs(2)));
+            let mut buf = [0u8; 256];
+            let _ = s.read(&mut buf);
+        }
     }
-    for _ in 0..20 {
+    for _ in 0..16 {
         if let Ok(Some(_)) = child.try_wait() {
             return; // exited gracefully (revert ran)
         }
-        std::thread::sleep(Duration::from_millis(150));
+        std::thread::sleep(Duration::from_millis(120));
     }
     #[cfg(windows)]
     kill_tree(child.id());
     let _ = child.kill();
+}
+
+/// Take the sidecar handle (if any) and shut it down. Idempotent: a second
+/// call finds `None` and no-ops, so it is safe to invoke from both the
+/// main-window-closed handler and the Exit backstop.
+fn shutdown_sidecar(app_handle: &tauri::AppHandle) {
+    let state: tauri::State<Sidecar> = app_handle.state();
+    let taken = state.child.lock().unwrap().take();
+    if let Some(mut child) = taken {
+        stop_sidecar(state.port, &state.token, &mut child);
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -162,22 +181,22 @@ pub fn run() {
         .expect("error while building tauri application");
 
     app.run(move |app_handle, event| match event {
-        // The hidden overlay window would keep the process alive after the
-        // main window closes, leaving a ghost instance that blocks every
-        // future launch. Closing the main window must quit the app.
+        // The hidden overlay window (alwaysOnTop, skipTaskbar) would keep the
+        // process alive after the main window closes, leaving a ghost that
+        // blocks every future launch and "runs in the background". Closing
+        // the main window must fully terminate the app: shut the sidecar down
+        // and then force-exit the OS process so nothing can keep it resident.
         tauri::RunEvent::WindowEvent {
             label,
             event: tauri::WindowEvent::Destroyed,
             ..
         } if label == "main" => {
-            app_handle.exit(0);
+            shutdown_sidecar(app_handle);
+            std::process::exit(0);
         }
+        // Backstop for any other exit route (tray quit, OS shutdown, etc.).
         tauri::RunEvent::Exit => {
-            let state: tauri::State<Sidecar> = app_handle.state();
-            let taken = state.child.lock().unwrap().take();
-            if let Some(mut child) = taken {
-                stop_sidecar(state.port, &state.token, &mut child);
-            }
+            shutdown_sidecar(app_handle);
         }
         _ => {}
     });

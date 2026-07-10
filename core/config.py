@@ -154,6 +154,17 @@ DEFAULTS = {
     "boost_game_bar": True,
     "boost_visual_effects": False,
     "boost_services": True,
+    # Advanced reversible latency tweaks (need admin; all restored on revert)
+    "boost_network_latency": True,     # disable Nagle's algorithm per-adapter
+    "boost_responsiveness": True,      # NetworkThrottlingIndex + SystemResponsiveness
+    "boost_games_scheduling": True,    # MMCSS Games task GPU/CPU/IO priority
+    "boost_power_latency": True,       # USB selective suspend off + CPU parking off
+    # Input / peripherals (persistent, applied immediately - NOT a boost toggle)
+    "mouse_enhance_pointer": True,     # Windows "enhance pointer precision"
+    "mouse_pointer_speed": 10,         # 1..20, 10 = default 1:1
+    # FPS overlay auto-target the foreground game
+    "fps_auto_target": True,
+    "overlay_locked": True,            # click-through unless the user unlocks it
     # Resolution feature
     "apply_res_on_game": False,
     "gaming_resolution": None,         # [w, h, hz] or None

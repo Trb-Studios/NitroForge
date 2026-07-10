@@ -35,7 +35,7 @@ import psutil
 
 from core import (bottleneck, config, crash_reporter, game_catalog,
                   game_scanner, logger as logmod, network_utils, power_utils,
-                  process_utils, resolution_utils, system_info)
+                  process_utils, resolution_utils, system_info, tweaks)
 from core.booster import Booster
 from core.db import Database, Sampler
 from core.fps_monitor import FpsMonitor
@@ -54,6 +54,10 @@ WRITABLE_SETTINGS = {
     "boost_suspend_apps", "boost_priority", "boost_affinity",
     "boost_power_plan", "boost_game_mode", "boost_game_bar",
     "boost_visual_effects", "boost_services", "suspend_apps",
+    "boost_network_latency", "boost_responsiveness", "boost_games_scheduling",
+    "boost_power_latency",
+    "mouse_enhance_pointer", "mouse_pointer_speed",
+    "fps_auto_target", "overlay_locked",
     "report_enabled", "report_auto_send", "report_discord_webhook",
     "report_site_url", "report_include_logs",
 }
@@ -82,6 +86,19 @@ class Services:
                 self.fps.current_stats()),
         )
         self.sampler.start()
+        self._fg_stop = threading.Event()
+        threading.Thread(target=self._foreground_loop, daemon=True,
+                         name="fps-autotarget").start()
+
+    def _foreground_loop(self) -> None:
+        """While capturing, keep the FPS overlay pointed at the foreground
+        game (opt-out via the fps_auto_target setting)."""
+        while not self._fg_stop.wait(2.0):
+            try:
+                if self.fps.running and self.settings.get("fps_auto_target"):
+                    self.fps.note_foreground(system_info.foreground_process_name())
+            except Exception:      # never let the helper thread die
+                pass
 
     def net_type(self) -> dict:
         """netsh shells out -> cache 30s so /api/live stays fast."""
@@ -325,6 +342,23 @@ def h_gpu_panel(_q, _b):
     return {"opened": power_utils.open_gpu_control_panel()}
 
 
+# ------------------------------------------------------------- input / mouse
+def h_input(_q, _b):
+    """Current mouse state (persistent settings, applied immediately)."""
+    return {"mouse": tweaks.get_mouse(),
+            "admin": system_info.is_admin()}
+
+
+def h_input_mouse(_q, body):
+    if "enhance_pointer" in body:
+        tweaks.set_enhance_pointer(bool(body["enhance_pointer"]))
+        SVC.settings.set("mouse_enhance_pointer", bool(body["enhance_pointer"]))
+    if "pointer_speed" in body:
+        tweaks.set_pointer_speed(int(body["pointer_speed"]))
+        SVC.settings.set("mouse_pointer_speed", int(body["pointer_speed"]))
+    return {"ok": True, "mouse": tweaks.get_mouse()}
+
+
 # ------------------------------------------------- crash / feedback routes
 def h_report_crash(_q, body):
     """Frontend error-boundary reports land here."""
@@ -386,6 +420,8 @@ ROUTES = {
     ("GET", "/api/startup"): h_startup,
     ("POST", "/api/startup/toggle"): h_startup_toggle,
     ("POST", "/api/gpu-panel"): h_gpu_panel,
+    ("GET", "/api/input"): h_input,
+    ("POST", "/api/input/mouse"): h_input_mouse,
     ("POST", "/api/report/crash"): h_report_crash,
     ("POST", "/api/report/feedback"): h_report_feedback,
     ("POST", "/api/report/test"): h_report_test,

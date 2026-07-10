@@ -40,6 +40,7 @@ class FpsMonitor:
         # per-process rolling frametimes: name -> deque[(wallclock, ft_ms)]
         self._frames: dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
         self.target: str | None = None      # process name filter, if any
+        self.auto_target: bool = True        # follow the foreground game
         self.last_error: str | None = None
 
     # ------------------------------------------------------------ control
@@ -59,7 +60,10 @@ class FpsMonitor:
             self.last_error = "PresentMon.exe path is not configured."
             return False
         exe = self._settings.get("presentmon_path")
+        # An explicit process disables auto-follow; empty means "track whatever
+        # game is in the foreground" (see note_foreground()).
         self.target = process_name
+        self.auto_target = not process_name
         for style in ("v2", "v1"):
             args = self._build_args(exe, style, process_name)
             try:
@@ -143,6 +147,20 @@ class FpsMonitor:
                     self._frames[name].append((time.time(), ft))
         except (ValueError, OSError):
             pass
+
+    def note_foreground(self, name: str | None) -> None:
+        """Auto-follow the foreground game: if auto-target is on and the
+        focused app is actively presenting frames, lock the overlay onto it.
+        Only switches to an app PresentMon is already seeing, so alt-tabbing to
+        the desktop or a browser never blanks a running game's counter."""
+        if not self.auto_target or not name:
+            return
+        low = name.lower()
+        with self._lock:
+            has_recent = low in self._frames and self._frames[low]
+        if has_recent and self.target != low:
+            self.target = low
+            self._log.info("FPS overlay now following foreground game: %s", low)
 
     # -------------------------------------------------------------- stats
     def current_stats(self) -> dict:

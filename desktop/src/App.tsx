@@ -28,7 +28,9 @@ export default function App() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [bootDone, setBootDone] = useState(false);
   const [status, setStatus] = useState("Starting engine...");
-  const live = usePoll<Live>("/live", 1500);
+  // 2s live poll keeps the UI responsive while roughly halving the app's own
+  // idle CPU wakeups vs a 1s cadence (lighter footprint while gaming).
+  const live = usePoll<Live>("/live", 2000);
 
   // Boot sequence: wait for the sidecar handshake (meta) + first live
   // sample, keep the intro on screen for at least MIN_BOOT_MS.

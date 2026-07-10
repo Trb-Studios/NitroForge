@@ -5,11 +5,18 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { PhysicalPosition, primaryMonitor } from "@tauri-apps/api/window";
-import { Crosshair, Download, FolderOpen, Play, Square } from "lucide-react";
+import { Crosshair, Download, FolderOpen, Lock, Move, Play, Square } from "lucide-react";
 import { api, type AppSettings, type Live } from "../api";
-import { Button, Card, Segmented, SectionTitle, TextInput } from "../components/ui";
+import { Button, Card, Segmented, SectionTitle, TextInput, Toggle } from "../components/ui";
 
 const CORNERS = ["top-left", "top-right", "bottom-left", "bottom-right"];
+
+/** Click-through when locked, so the overlay never moves or steals clicks
+ *  mid-game; interactive (draggable) when unlocked. */
+async function setOverlayLocked(locked: boolean) {
+  const overlay = await WebviewWindow.getByLabel("overlay");
+  if (overlay) await overlay.setIgnoreCursorEvents(locked);
+}
 
 async function positionOverlay(corner: string) {
   const overlay = await WebviewWindow.getByLabel("overlay");
@@ -28,6 +35,8 @@ export default function OverlayPage({ live }: { live: Live | null }) {
   const [corner, setCorner] = useState("top-left");
   const [size, setSize] = useState("medium");
   const [visible, setVisible] = useState(false);
+  const [locked, setLocked] = useState(true);
+  const [autoTarget, setAutoTarget] = useState(true);
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -35,9 +44,17 @@ export default function OverlayPage({ live }: { live: Live | null }) {
       setPmPath(s.presentmon_path || "");
       setCorner(s.overlay_corner || "top-left");
       setSize(s.overlay_size || "medium");
+      setAutoTarget(s.fps_auto_target !== false);
+      setLocked(s.overlay_locked !== false);
     }).catch(() => {});
     WebviewWindow.getByLabel("overlay").then((w) => w?.isVisible().then(setVisible));
   }, []);
+
+  const applyLock = async (v: boolean) => {
+    setLocked(v);
+    await setOverlayLocked(v);
+    await api("/settings", { key: "overlay_locked", value: v });
+  };
 
   const pickPresentMon = async () => {
     const path = await open({
@@ -73,6 +90,7 @@ export default function OverlayPage({ live }: { live: Live | null }) {
     } else {
       await positionOverlay(corner);
       await overlay.show();
+      await setOverlayLocked(locked);   // apply click-through state on show
       setVisible(true);
     }
   };
@@ -174,10 +192,42 @@ export default function OverlayPage({ live }: { live: Live | null }) {
                 }}
               />
             </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {locked ? <Lock size={14} className="text-ok" /> : <Move size={14} className="text-warn" />}
+                <div>
+                  <div className="text-[13px] font-medium">
+                    {locked ? "Locked (click-through)" : "Move mode"}
+                  </div>
+                  <div className="text-[11px] text-mute">
+                    {locked
+                      ? "Won't move or catch clicks while you play"
+                      : "Drag the overlay to reposition, then lock it"}
+                  </div>
+                </div>
+              </div>
+              <Button kind="ghost" onClick={() => applyLock(!locked)}>
+                {locked ? "Move overlay" : "Lock overlay"}
+              </Button>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[13px] font-medium">Auto-follow foreground game</div>
+                <div className="text-[11px] text-mute">
+                  Points the counter at whatever game you tab into
+                </div>
+              </div>
+              <Toggle
+                on={autoTarget}
+                onChange={async (v) => {
+                  setAutoTarget(v);
+                  await api("/settings", { key: "fps_auto_target", value: v });
+                }}
+              />
+            </div>
             <div className="text-[11.5px] text-mute leading-relaxed">
               Games in <b>exclusive fullscreen</b> bypass every desktop overlay -
-              use borderless/windowed mode. You can also drag the overlay
-              anywhere with the mouse.
+              use borderless/windowed mode.
             </div>
           </div>
         </Card>
