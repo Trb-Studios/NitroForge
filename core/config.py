@@ -19,7 +19,7 @@ from pathlib import Path
 
 APP_NAME = "NitroForge"
 APP_DISPLAY_NAME = "Nitro Forge"
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.0.1"
 
 _LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
 APP_DIR = _LOCALAPPDATA / APP_NAME

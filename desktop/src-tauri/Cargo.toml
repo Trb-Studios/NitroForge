@@ -1,6 +1,6 @@
 [package]
 name = "nitro-forge"
-version = "2.0.0"
+version = "2.0.1"
 description = "Nitro Forge - game-focused PC optimizer"
 authors = ["TRB Studios"]
 edition = "2021"
