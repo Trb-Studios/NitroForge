@@ -4,6 +4,23 @@
   "use strict";
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  // Frame-sync helper: coalesces high-rate events (1000 Hz mice fire
+  // pointermove far faster than the display refreshes) into at most one
+  // style write per animation frame. This is the core anti-lag fix.
+  const rafThrottle = (fn) => {
+    let scheduled = false;
+    let lastArgs;
+    return (...args) => {
+      lastArgs = args;
+      if (scheduled) return;
+      scheduled = true;
+      requestAnimationFrame(() => {
+        scheduled = false;
+        fn(...lastArgs);
+      });
+    };
+  };
+
   // ---- split the hero headline into animated words ------------------
   document.querySelectorAll("[data-reveal-split]").forEach((el) => {
     const words = el.textContent.split(" ");
@@ -103,54 +120,66 @@
   // ---- nav shadow + scroll progress --------------------------------
   const nav = document.getElementById("nav");
   const bar = document.querySelector(".scroll-progress");
-  const onScroll = () => {
+  const onScroll = rafThrottle(() => {
     const y = window.scrollY;
     nav?.classList.toggle("scrolled", y > 12);
     if (bar) {
       const h = document.documentElement.scrollHeight - window.innerHeight;
-      bar.style.width = `${h > 0 ? (y / h) * 100 : 0}%`;
+      bar.style.transform = `scaleX(${h > 0 ? y / h : 0})`;
     }
-  };
+  });
+  if (bar) {
+    bar.style.width = "100%";          // animate transform, not width
+    bar.style.transformOrigin = "left";
+    bar.style.transform = "scaleX(0)";
+  }
   window.addEventListener("scroll", onScroll, { passive: true });
   onScroll();
 
   if (reduce) return; // skip pointer-driven motion for reduced-motion users
 
-  // ---- magnetic buttons --------------------------------------------
+  // ---- magnetic buttons (frame-synced) ------------------------------
   document.querySelectorAll(".magnetic").forEach((el) => {
-    el.addEventListener("pointermove", (e) => {
+    const move = rafThrottle((e) => {
       const r = el.getBoundingClientRect();
       const mx = e.clientX - r.left - r.width / 2;
       const my = e.clientY - r.top - r.height / 2;
       el.style.transform = `translate(${mx * 0.18}px, ${my * 0.28}px)`;
     });
-    el.addEventListener("pointerleave", () => (el.style.transform = ""));
+    el.addEventListener("pointermove", move, { passive: true });
+    el.addEventListener("pointerleave", () => {
+      // ease back with a temporary transition, then hand control to JS again
+      el.style.transition = "transform .3s cubic-bezier(.22,1,.36,1)";
+      el.style.transform = "";
+      setTimeout(() => (el.style.transition = ""), 320);
+    });
   });
 
-  // ---- 3D tilt on cards / mock -------------------------------------
+  // ---- 3D tilt on cards / mock (frame-synced) ------------------------
   document.querySelectorAll("[data-tilt]").forEach((el) => {
-    el.addEventListener("pointermove", (e) => {
+    const move = rafThrottle((e) => {
       const r = el.getBoundingClientRect();
       const px = (e.clientX - r.left) / r.width - 0.5;
       const py = (e.clientY - r.top) / r.height - 0.5;
       el.style.transform = `perspective(900px) rotateY(${px * 6}deg) rotateX(${-py * 6}deg)`;
     });
-    el.addEventListener("pointerleave", () => (el.style.transform = ""));
+    el.addEventListener("pointermove", move, { passive: true });
+    el.addEventListener("pointerleave", () => {
+      el.style.transition = "transform .35s cubic-bezier(.22,1,.36,1)";
+      el.style.transform = "";
+      setTimeout(() => (el.style.transition = ""), 370);
+    });
   });
 
-  // ---- parallax the aurora blobs to the pointer --------------------
-  const blobs = document.querySelectorAll(".aurora");
-  window.addEventListener(
-    "pointermove",
-    (e) => {
+  // ---- background parallax: ONE composited transform on the wrapper,
+  // not per-blob margin writes (margins force layout on every mousemove)
+  const backdrop = document.querySelector(".backdrop");
+  if (backdrop) {
+    const drift = rafThrottle((e) => {
       const cx = e.clientX / window.innerWidth - 0.5;
       const cy = e.clientY / window.innerHeight - 0.5;
-      blobs.forEach((b, i) => {
-        const depth = (i + 1) * 14;
-        b.style.marginLeft = `${cx * depth}px`;
-        b.style.marginTop = `${cy * depth}px`;
-      });
-    },
-    { passive: true },
-  );
+      backdrop.style.transform = `translate(${cx * 18}px, ${cy * 18}px) scale(1.03)`;
+    });
+    window.addEventListener("pointermove", drift, { passive: true });
+  }
 })();
