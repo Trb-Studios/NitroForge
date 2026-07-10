@@ -206,6 +206,23 @@ footer { border-top: 1px solid var(--line); padding: 40px 0; margin-top: 40px; }
 .foot .links a:hover { color: var(--accent); }
 .foot .copy { color: var(--mute); font-size: 12px; max-width: 70ch; }
 
+/* ------------------------------------------------ download toast */
+#dl-toast {
+  position: fixed; right: 22px; bottom: 22px; z-index: 80;
+  display: flex; gap: 12px; align-items: flex-start;
+  max-width: 340px; padding: 14px 18px;
+  background: linear-gradient(180deg, var(--card2), var(--card));
+  border: 1px solid rgba(124, 192, 244, 0.4); border-radius: 14px;
+  box-shadow: var(--shadow), 0 0 24px rgba(124, 192, 244, 0.25);
+  opacity: 0; transform: translateY(16px) scale(0.97); pointer-events: none;
+  transition: opacity .35s cubic-bezier(.22,1,.36,1), transform .35s cubic-bezier(.22,1,.36,1);
+}
+#dl-toast.show { opacity: 1; transform: none; }
+#dl-toast b { font-size: 14px; display: block; }
+#dl-toast small { color: var(--ink2); font-size: 12px; line-height: 1.45; display: block; margin-top: 3px; }
+.dl-check { flex-shrink: 0; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; background: rgba(76,194,92,.18); position: relative; animation: pip 2s infinite; }
+.dl-check::after { content: ""; position: absolute; left: 8px; top: 4px; width: 5px; height: 10px; border: solid var(--ok); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+
 /* ---------------------------------------------- scroll reveal engine */
 [data-reveal] { opacity: 0; transform: translateY(28px); transition: opacity .7s cubic-bezier(.22,1,.36,1), transform .7s cubic-bezier(.22,1,.36,1); }
 [data-reveal].in { opacity: 1; transform: none; }

@@ -76,6 +76,30 @@
     requestAnimationFrame(step);
   }
 
+  // ---- download feedback toast --------------------------------------
+  // The installer is served straight from this site (downloads/...exe with
+  // the `download` attribute), so the click already "just downloads" - this
+  // adds the "your download has started" confirmation users expect.
+  document.querySelectorAll('a[href$="NitroForgeSetup.exe"]').forEach((a) => {
+    a.addEventListener("click", () => {
+      let toast = document.getElementById("dl-toast");
+      if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "dl-toast";
+        toast.innerHTML =
+          '<span class="dl-check"></span><div><b>Download started</b>' +
+          "<small>Run NitroForgeSetup.exe when it finishes. Windows " +
+          "SmartScreen may ask once - choose More info &gt; Run anyway.</small></div>";
+        document.body.appendChild(toast);
+      }
+      toast.classList.remove("show");
+      void toast.offsetWidth; // restart the animation
+      toast.classList.add("show");
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => toast.classList.remove("show"), 7000);
+    });
+  });
+
   // ---- nav shadow + scroll progress --------------------------------
   const nav = document.getElementById("nav");
   const bar = document.querySelector(".scroll-progress");
