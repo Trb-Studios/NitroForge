@@ -46,6 +46,9 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: desktop/src-tauri
+      # tauri-build requires the frontendDist folder to exist, but
+      # desktop/dist is gitignored - create it for the check build
+      - run: mkdir -Force desktop/dist | Out-Null
       - run: cargo check
         working-directory: desktop/src-tauri
 
